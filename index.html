@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IOT MONITORING - I'MechD</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            background: #0b0e14;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            background-image: radial-gradient(#1c222b 1px, transparent 1px);
+            background-size: 25px 25px;
+        }
+
+        .grid-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 15px;
+            padding: 25px;
+            height: 100%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            transition: 0.3s;
+        }
+
+        .grid-card:hover {
+            border-color: #58a6ff;
+        }
+
+        .status-box {
+            font-size: 1.3rem;
+            font-weight: bold;
+            background: #0d1117;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            min-height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .led {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #21262d;
+            border: 3px solid #30363d;
+            margin: 0 auto;
+            transition: 0.3s;
+        }
+
+        .red.on {
+            background: #ff4444;
+            box-shadow: 0 0 25px #ff4444;
+        }
+
+        .yellow.on {
+            background: #ffbb33;
+            box-shadow: 0 0 25px #ffbb33;
+        }
+
+        .green.on {
+            background: #00c851;
+            box-shadow: 0 0 25px #00c851;
+        }
+
+        .blink {
+            animation: alert-blink 1s infinite;
+        }
+
+        @keyframes alert-blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .log-container {
+            max-height: 280px;
+            overflow-y: auto;
+            background: #0d1117;
+            border-radius: 10px;
+            border: 1px solid #30363d;
+            font-size: 0.85rem;
+        }
+
+        .table {
+            color: #c9d1d9;
+            margin-bottom: 0;
+        }
+
+        .table thead {
+            background: #1c2128;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .text-time {
+            color: #8b949e;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn-unlock {
+            width: 100%;
+            margin-top: 15px;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 12px;
+            background: linear-gradient(45deg, #d4a017, #f4d03f);
+            border: none;
+            color: #000;
+        }
+
+        .btn-unlock:hover {
+            background: #f4d03f;
+            transform: scale(1.02);
+        }
+
+        .btn-clear {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="fw-bold text-primary">MONITORING SYSTEM I'MechD</h1>
+            <p class="text-muted">Real-time Port & Water Level Control</p>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="grid-card text-center">
+                    <h4>🌊 Sinyal Ultrasonic</h4>
+                    <div id="air-text" class="status-box text-info">Menunggu Data...</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="grid-card text-center">
+                    <h4>🚢 Sinyal Infrared</h4>
+                    <div id="ir-text" class="status-box text-danger">STANDBY</div>
+                    <button class="btn btn-unlock" onclick="sendUnlock()">🔓 Membuka Pengunci</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5 text-center">
+            <div class="col-12">
+                <div class="grid-card">
+                    <h4 class="mb-4">🚨 Lamp Status</h4>
+                    <div class="row">
+                        <div class="col-4">
+                            <div id="led-m" class="led red"></div><small class="d-block mt-2">STOP</small>
+                        </div>
+                        <div class="col-4">
+                            <div id="led-k" class="led yellow"></div><small class="d-block mt-2">WAIT</small>
+                        </div>
+                        <div class="col-4">
+                            <div id="led-h" class="led green"></div><small class="d-block mt-2">GO</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 text-start">
+            <div class="col-md-6">
+                <div class="grid-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-info m-0">📋 Log Ketinggian Air</h5>
+                        <button class="btn btn-outline-danger btn-clear" onclick="clearLog('water')">Hapus Log</button>
+                    </div>
+                    <div class="log-container">
+                        <table class="table table-dark table-sm table-hover text-center">
+                            <thead>
+                                <tr>
+                                    <th>Waktu</th>
+                                    <th>Jarak</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-water"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="grid-card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-warning m-0">📋 Log Aktivitas Kapal</h5>
+                        <button class="btn btn-outline-danger btn-clear" onclick="clearLog('gate')">Hapus Log</button>
+                    </div>
+                    <div class="log-container">
+                        <table class="table table-dark table-sm table-hover text-center">
+                            <thead>
+                                <tr>
+                                    <th>Waktu</th>
+                                    <th>Aktivitas</th>
+                                    <th>Status Pintu</th>
+                                </tr>
+                            </thead>
+                            <tbody id="log-gate"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+        let lastGateStatus = "";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSavedLogs('log-water');
+            loadSavedLogs('log-gate');
+        });
+
+        function getTime() {
+            const now = new Date();
+            return now.getHours().toString().padStart(2, '0') + ":" +
+                now.getMinutes().toString().padStart(2, '0') + ":" +
+                now.getSeconds().toString().padStart(2, '0');
+        }
+
+        function addLog(targetId, col1, col2, colorClass = "", save = true) {
+            const tbody = document.getElementById(targetId);
+            const time = getTime();
+            const rowHTML = `<tr><td class="text-time">${time}</td><td>${col1}</td><td class="${colorClass}">${col2}</td></tr>`;
+
+            tbody.insertAdjacentHTML('afterbegin', rowHTML);
+            if (tbody.rows.length > 30) tbody.deleteRow(tbody.rows.length - 1);
+
+            if (save) {
+                let logs = JSON.parse(localStorage.getItem(targetId)) || [];
+                logs.unshift({ time, col1, col2, colorClass });
+                if (logs.length > 30) logs.pop();
+                localStorage.setItem(targetId, JSON.stringify(logs));
+            }
+        }
+
+        function loadSavedLogs(targetId) {
+            const tbody = document.getElementById(targetId);
+            const logs = JSON.parse(localStorage.getItem(targetId)) || [];
+            logs.reverse().forEach(log => {
+                const rowHTML = `<tr><td class="text-time">${log.time}</td><td>${log.col1}</td><td class="${log.colorClass}">${log.col2}</td></tr>`;
+                tbody.insertAdjacentHTML('afterbegin', rowHTML);
+            });
+        }
+
+        function clearLog(type) {
+            const targetId = 'log-' + type;
+            localStorage.removeItem(targetId);
+            document.getElementById(targetId).innerHTML = "";
+        }
+
+        // REVISI: Fungsi Unlock dengan Penambahan Log Manual
+        function sendUnlock() {
+            client.publish("robot/control", "unlock");
+
+            // Menambahkan log ke tabel aktivitas kapal dengan keterangan baru
+            addLog("log-gate", "Intervensi Web", "Pintu Terbuka ", "text-danger fw-bold");
+
+            const btn = document.querySelector('.btn-unlock');
+            btn.innerText = "🔒 Mengunci Paksa...";
+            btn.className = "btn btn-danger w-100 mt-3"; // Ubah warna jadi merah saat klik
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.innerText = "🔓 Membuka Pengunci";
+                btn.className = "btn-unlock"; // Kembali ke style awal
+                btn.disabled = false;
+            }, 5000);
+        }
+
+        client.on('connect', () => {
+            client.subscribe('robot/#');
+        });
+
+        client.on('message', (topic, message) => {
+            const rawMsg = message.toString().trim();
+
+            if (topic === 'robot/air') {
+                const dist = parseFloat(rawMsg);
+                if (isNaN(dist)) return;
+                const el = document.getElementById('air-text');
+
+                // REVISI LOGIKA TAMPILAN WEB
+                if (dist < 10) {
+                    el.innerText = "Waspada Banjir Rop, kedalaman Air +- 11 cm";
+                    el.className = "status-box text-danger blink";
+                    addLog("log-water", `${dist} cm`, "Banjir Rop (+-11cm)", "text-danger fw-bold");
+                } else if (dist < 14) {
+                    el.innerText = "Status siaga, kedalaman Air +- 7 cm";
+                    el.className = "status-box text-warning";
+                    addLog("log-water", `${dist} cm`, "Siaga (+-7cm)", "text-warning");
+                } else {
+                    el.innerText = `Kondisi Air Normal (${dist} cm)`;
+                    el.className = "status-box text-info";
+                    addLog("log-water", `${dist} cm`, "Normal", "text-info");
+                }
+            }
+
+            if (topic === 'robot/kapal') {
+                const el = document.getElementById('ir-text');
+                if (rawMsg === 'buka_gate') {
+                    el.innerText = "Kapal Terdeteksi";
+                    el.className = "status-box text-success";
+                    if (lastGateStatus !== "OPEN") {
+                        addLog("log-gate", "Kapal Terdeteksi", "Gate Terkunci", "text-success fw-bold");
+                        lastGateStatus = "OPEN";
+                    }
+                } else if (rawMsg === 'standby') {
+                    el.innerText = "STANDBY";
+                    el.className = "status-box text-danger";
+                    if (lastGateStatus !== "IDLE") {
+                        addLog("log-gate", "Kapal Tidak Berlabuh", "Siaga/Tertutup", "text-muted");
+                        lastGateStatus = "IDLE";
+                    }
+                }
+            }
+
+            if (topic === 'robot/led') {
+                document.querySelectorAll('.led').forEach(l => l.classList.remove('on'));
+                if (rawMsg === 'merah') document.getElementById('led-m').classList.add('on');
+                if (rawMsg === 'kuning') document.getElementById('led-k').classList.add('on');
+                if (rawMsg === 'hijau') document.getElementById('led-h').classList.add('on');
+            }
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
