@@ -7,6 +7,8 @@
     <title>IOT MONITORING - I'MechD</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         body {
             background: #0b0e14;
@@ -125,11 +127,179 @@
             font-size: 0.7rem;
             padding: 2px 8px;
         }
+
+        /* ------- FITUR SIDEBAR ------- */
+        .sidebar-toggle {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 1050;
+            background: linear-gradient(145deg, #2d333b, #1c2128);
+            border: 1px solid #444c56;
+            border-radius: 60px;
+            padding: 15px 20px;
+            color: #58a6ff;
+            font-size: 1.3rem;
+            font-weight: bold;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            transition: 0.3s;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            white-space: nowrap;
+        }
+        .sidebar-toggle:hover {
+            background: #2d333b;
+            border-color: #58a6ff;
+            transform: scale(1.05);
+        }
+        /* style saat sidebar terbuka - hanya ikon */
+        .sidebar-toggle.icon-only {
+            padding: 15px 18px;
+            font-size: 1.5rem;
+        }
+        .offcanvas {
+            background: #0d1117;
+            border-left: 2px solid #2d333b;
+            color: #c9d1d9;
+            width: 400px !important;
+        }
+        .offcanvas-header {
+            border-bottom: 1px solid #30363d;
+        }
+        .offcanvas-title {
+            color: #58a6ff;
+            font-weight: bold;
+        }
+        .btn-close {
+            filter: invert(0.8);
+        }
+        .weather-card, .tide-card {
+            background: #161b22;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #2d333b;
+        }
+        .weather-city {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+        .weather-temp {
+            font-size: 2rem;
+            font-weight: 300;
+            color: #58a6ff;
+        }
+        .weather-desc {
+            text-transform: capitalize;
+            color: #8b949e;
+        }
+        .tide-level {
+            font-size: 2.2rem;
+            font-weight: 300;
+            color: #7ee3ff;
+        }
+        .progress {
+            background-color: #1c2128;
+            height: 10px;
+            border-radius: 10px;
+        }
+        .progress-bar {
+            background: #00c851;
+            border-radius: 10px;
+        }
+        .badge-bmkg {
+            background: #1f6feb;
+            color: white;
+            font-size: 0.7rem;
+        }
+        .refresh-time {
+            font-size: 0.7rem;
+            color: #6e7681;
+        }
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+            margin-top: 15px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 
 <body>
 
+    <!-- ========== SIDEBAR TOGGLE BUTTON ========== -->
+    <div class="sidebar-toggle" id="sidebarToggle" data-bs-toggle="offcanvas" data-bs-target="#fiturSidebar">
+        🌦️ Fitur &nbsp; ▸
+    </div>
+
+    <!-- ========== OFF CANVAS SIDEBAR ========== -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="fiturSidebar" aria-labelledby="fiturSidebarLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="fiturSidebarLabel">🌐 Dashboard Maritim</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <!-- Section Monitoring -->
+            <div class="mb-4">
+                <h6 class="text-info border-bottom pb-2">📡 Monitoring Sistem</h6>
+                <div class="weather-card">
+                    <div class="d-flex justify-content-between">
+                        <span>MQTT Broker</span>
+                        <span id="mqtt-status" class="badge bg-success">Terhubung</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2">
+                        <span>Server Time</span>
+                        <span id="server-time" class="text-time">--:--:--</span>
+                    </div>
+                    <div class="d-flex justify-content-between mt-2">
+                        <span>Last Update</span>
+                        <span id="last-update" class="text-time">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section Cuaca Real-time -->
+            <div class="mb-4">
+                <h6 class="text-warning border-bottom pb-2">🌤️ Cuaca Real-time</h6>
+                <div id="weather-container">
+                    <!-- akan diisi JS -->
+                    <div class="text-center text-muted py-3">Memuat data cuaca...</div>
+                </div>
+                <!-- Grafik suhu per jam Jakarta -->
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-info small">🔥 Suhu per Jam - Jakarta</span>
+                        <span class="refresh-time" id="chart-refresh">⏱️</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="hourlyTempChart"></canvas>
+                    </div>
+                </div>
+                <div class="refresh-time text-end mt-1" id="weather-refresh">⏱️ updating...</div>
+            </div>
+
+            <!-- Section Pasang Surut -->
+            <div class="mb-4">
+                <h6 class="text-primary border-bottom pb-2">🌊 Pasang Surut Jakarta</h6>
+                <div class="tide-card text-center">
+                    <div class="tide-level" id="tide-value">0.0 m</div>
+                    <div class="progress my-2">
+                        <div id="tide-progress" class="progress-bar" role="progressbar" style="width: 50%;"></div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted">
+                        <span>Surut</span>
+                        <span>Pasang</span>
+                    </div>
+                    <div class="mt-3 small" id="tide-desc">Kondisi normal</div>
+                    <div class="badge-bmkg mt-2 px-2 py-1 rounded-pill">Sumber: Simulasi Pasut</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== CONTENT UTAMA ========== -->
     <div class="container py-5">
         <div class="text-center mb-5">
             <h1 class="fw-bold text-primary">MONITORING SYSTEM I'MechD</h1>
@@ -217,6 +387,7 @@
     </div>
 
     <script>
+        // ========== KODE ASLI ==========
         const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
         let lastGateStatus = "";
 
@@ -263,21 +434,18 @@
             document.getElementById(targetId).innerHTML = "";
         }
 
-        // REVISI: Fungsi Unlock dengan Penambahan Log Manual
         function sendUnlock() {
             client.publish("robot/control", "unlock");
-
-            // Menambahkan log ke tabel aktivitas kapal dengan keterangan baru
             addLog("log-gate", "Intervensi Web", "Pintu Terbuka ", "text-danger fw-bold");
 
             const btn = document.querySelector('.btn-unlock');
-            btn.innerText = "🔒 Mengunci Paksa...";
-            btn.className = "btn btn-danger w-100 mt-3"; // Ubah warna jadi merah saat klik
+            btn.innerText = "🔒 Prosess...";
+            btn.className = "btn btn-danger w-100 mt-3";
             btn.disabled = true;
 
             setTimeout(() => {
                 btn.innerText = "🔓 Membuka Pengunci";
-                btn.className = "btn-unlock"; // Kembali ke style awal
+                btn.className = "btn-unlock";
                 btn.disabled = false;
             }, 5000);
         }
@@ -294,7 +462,6 @@
                 if (isNaN(dist)) return;
                 const el = document.getElementById('air-text');
 
-                // REVISI LOGIKA TAMPILAN WEB
                 if (dist < 10) {
                     el.innerText = "Waspada Banjir Rop, kedalaman Air +- 11 cm";
                     el.className = "status-box text-danger blink";
@@ -336,6 +503,172 @@
                 if (rawMsg === 'hijau') document.getElementById('led-h').classList.add('on');
             }
         });
+
+        // ========== KODE BARU: FITUR SIDEBAR + CHART + TOGGLE ICON ==========
+        const cities = [
+            { name: "Jakarta", lat: -6.2088, lon: 106.8456 },
+            { name: "Surabaya", lat: -7.2575, lon: 112.7521 },
+            { name: "Bandung", lat: -6.9175, lon: 107.6191 }
+        ];
+
+        let hourlyChart = null;
+
+        async function fetchWeather() {
+            const container = document.getElementById('weather-container');
+            let html = '';
+            for (let city of cities) {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current_weather=true&timezone=auto`;
+                try {
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    const w = data.current_weather;
+                    const temperature = w.temperature;
+                    const wind = w.windspeed;
+                    const code = w.weathercode;
+                    let desc = getWeatherDesc(code);
+                    html += `
+                        <div class="weather-card d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="weather-city">${city.name}</div>
+                                <div class="weather-desc">${desc}</div>
+                                <div class="small text-white">💨 ${wind} km/h</div>
+                            </div>
+                            <div class="weather-temp">${temperature}°C</div>
+                        </div>
+                    `;
+                } catch (e) {
+                    html += `<div class="weather-card text-danger">Gagal memuat ${city.name}</div>`;
+                }
+            }
+            container.innerHTML = html || '<div class="text-muted">Data tidak tersedia</div>';
+            document.getElementById('weather-refresh').innerText = `⏱️ ${getTime()}`;
+        }
+
+        function getWeatherDesc(code) {
+            if (code === 0) return 'Cerah';
+            if (code === 1) return 'Umumnya cerah';
+            if (code === 2) return 'Berawan';
+            if (code === 3) return 'Berawan tebal';
+            if (code >= 45 && code <= 49) return 'Kabut';
+            if (code >= 51 && code <= 55) return 'Gerimis';
+            if (code >= 61 && code <= 65) return 'Hujan';
+            if (code >= 71 && code <= 75) return 'Salju';
+            if (code >= 80 && code <= 82) return 'Hujan deras';
+            if (code >= 95) return 'Badai';
+            return 'Berawan';
+        }
+
+        async function fetchHourlyWeather() {
+            const url = 'https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&hourly=temperature_2m&timezone=auto&forecast_days=1';
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const hourly = data.hourly;
+                const times = hourly.time.slice(0, 12).map(t => {
+                    const date = new Date(t);
+                    return date.getHours() + ':00';
+                });
+                const temps = hourly.temperature_2m.slice(0, 12);
+
+                updateChart(times, temps);
+                document.getElementById('chart-refresh').innerText = `⏱️ ${getTime()}`;
+            } catch (e) {
+                console.error('Gagal ambil data hourly:', e);
+            }
+        }
+
+        function updateChart(labels, data) {
+            const ctx = document.getElementById('hourlyTempChart').getContext('2d');
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+            hourlyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Suhu (°C)',
+                        data: data,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#f0f6fc',
+                        pointBorderColor: '#58a6ff',
+                        tension: 0.2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' }
+                        },
+                        y: {
+                            grid: { color: '#30363d' },
+                            ticks: { color: '#8b949e' },
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTide() {
+            const now = new Date();
+            const hours = now.getUTCHours() + 7;
+            const minutes = now.getMinutes();
+            const timeOfDay = hours + minutes/60;
+            const rad = (timeOfDay % 12) * (2 * Math.PI / 12);
+            let level = 1.2 + 0.8 * Math.sin(rad - Math.PI/2);
+            level = Math.round(level * 10) / 10;
+            document.getElementById('tide-value').innerText = level + ' m';
+            const percent = ((level - 0.4) / (2.0 - 0.4)) * 100;
+            document.getElementById('tide-progress').style.width = percent + '%';
+            let desc = '';
+            if (level < 0.8) desc = 'Surut menuju rendah';
+            else if (level > 1.6) desc = 'Pasang menuju tinggi';
+            else desc = 'Kondisi normal';
+            document.getElementById('tide-desc').innerText = desc + ' (simulasi)';
+        }
+
+        function updateSidebarStatus() {
+            document.getElementById('server-time').innerText = getTime();
+            document.getElementById('last-update').innerText = getTime();
+        }
+
+        // ========== TOGGLE ICON SIDEBAR ==========
+        const sidebar = document.getElementById('fiturSidebar');
+        const toggleBtn = document.getElementById('sidebarToggle');
+
+        sidebar.addEventListener('show.bs.offcanvas', function () {
+            toggleBtn.classList.add('icon-only');
+            toggleBtn.innerHTML = '🌦️'; // hanya ikon
+        });
+
+        sidebar.addEventListener('hide.bs.offcanvas', function () {
+            toggleBtn.classList.remove('icon-only');
+            toggleBtn.innerHTML = '🌦️ Fitur &nbsp; ▸'; // kembali ke teks
+        });
+
+        // Initial fetch
+        fetchWeather();
+        fetchHourlyWeather();
+        updateTide();
+        updateSidebarStatus();
+
+        setInterval(() => {
+            fetchWeather();
+            fetchHourlyWeather();
+            updateTide();
+            updateSidebarStatus();
+        }, 30000);
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
