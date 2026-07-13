@@ -6,6 +6,10 @@
      background-size: 25px 25px;
  }
 
+ .text-center p {
+  color: #fff;
+ }
+
  .grid-card {
      background: #161b22;
      border: 1px solid #30363d;
